@@ -1,20 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useLogout } from '@/features/auth/hooks/useLogout';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { configureAmplify } from '@/lib/auth/amplify-config';
+import { configureAmplifyOAuth } from '@/lib/auth/amplify-config-oauth';
+
+// Configure Amplify BEFORE component renders
+if (typeof window !== 'undefined') {
+  const hasOAuthCookie = document.cookie.includes('ojkkctuvfmhpv4d16gvsjt6co');
+  
+  if (hasOAuthCookie) {
+    console.log('🔵 Detected Cognito OAuth session - configuring OAuth client');
+    configureAmplifyOAuth();
+  } else {
+    console.log('🟢 Detected Cognito SRP session - configuring SRP client');
+    configureAmplify();
+  }
+}
 
 export default function DashboardPage() {
   const { data: user, isLoading, isError } = useAuth();
   const logout = useLogout();
-
-  useEffect(() => {
-    configureAmplify();
-  }, []);
 
   if (isLoading) {
     return (
@@ -77,6 +86,10 @@ export default function DashboardPage() {
           <div className="pt-4 border-t space-y-2">
             <Button asChild variant="outline" className="w-full">
               <a href="/token-debug">🔍 View Token Debug Tool</a>
+            </Button>
+            
+            <Button asChild variant="outline" className="w-full">
+              <a href="/api-test">🧪 Test Protected APIs</a>
             </Button>
             
             <Button
