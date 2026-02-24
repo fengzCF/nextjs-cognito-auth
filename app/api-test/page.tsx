@@ -9,11 +9,13 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { configureAmplify } from '@/lib/auth/amplify-config';
 import { configureAmplifyOAuth } from '@/lib/auth/amplify-config-oauth';
 import { config } from '@/lib/config/env';
+import { useRouter } from 'next/navigation';
 
 export default function ApiTestPage() {
   const [results, setResults] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [amplifyConfigured, setAmplifyConfigured] = useState(false);
+  const router = useRouter();
 
   // Configure Amplify on component mount
   useEffect(() => {
@@ -143,12 +145,18 @@ export default function ApiTestPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl py-8">     <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">API Testing</h1>
-          <p className="mt-2 text-muted-foreground">
-            Test protected API routes with your access token
-          </p>
+    <div className="container mx-auto max-w-4xl py-8">
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">API Testing</h1>
+            <p className="mt-2 text-muted-foreground">
+              Test protected API routes with your access token
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            ← Back to Dashboard
+          </Button>
         </div>
 
         <Card>
