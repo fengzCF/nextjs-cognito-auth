@@ -3,21 +3,73 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getStoredTokens, isAuth0Authenticated } from '@/lib/auth/auth0';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { configureAmplify } from '@/lib/auth/amplify-config';
+import { configureAmplifyOAuth } from '@/lib/auth/amplify-config-oauth';
+import { config } from '@/lib/config/env';
 
 export default function ApiTestPage() {
   const [results, setResults] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [amplifyConfigured, setAmplifyConfigured] = useState(false);
+
+  // Configure Amplify on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check if OAuth client cookie exists
+      // Cookie format: CognitoIdentityServiceProvider.{clientId}.{userId}.accessToken
+      const oauthClientId = config.cognito.oauthClientId;
+      const hasOAuthCookie = document.cookie.includes(oauthClientId);
+      
+      console.log('🔍 Checking authentication type...');
+      console.log('OAuth Client ID:', oauthClientId);
+      console.log('Has OAuth cookie:', hasOAuthCookie);
+      
+      if (hasOAuthCookie) {
+        console.log('🔵 API Test - Configuring OAuth client for Cognito OAuth');
+        configureAmplifyOAuth();
+      } else {
+        console.log('🟢 API Test - Configuring SRP client for Cognito SRP');
+        configureAmplify();
+      }
+      setAmplifyConfigured(true);
+    }
+  }, []);
 
   const getAccessToken = async () => {
-    if (isAuth0Authenticated()) {
-      const tokens = getStoredTokens();
-      return tokens?.accessToken || null;
+    try {
+      // Check Auth0 first
+      if (isAuth0Authenticated()) {
+        const tokens = getStoredTokens();
+        console.log('🔵 Using Auth0 token');
+        return tokens?.accessToken || null;
+      }
+      
+      // Cognito - fetch session from Amplify
+      console.log('🟢 Fetching Cognito session...');
+      const session = await fetchAuthSession({ forceRefresh: false });
+      
+      if (!session.tokens?.accessToken) {
+        console.error('❌ No access token in session');
+        console.log('Session details:', {
+          hasTokens: !!session.tokens,
+          hasAccessToken: !!session.tokens?.accessToken,
+          hasIdToken: !!session.tokens?.idToken,
+        });
+        return null;
+      }
+      
+      const token = session.tokens.accessToken.toString();
+      console.log('✅ Access token retrieved, length:', token.length);
+      console.log('Token (first 50 chars):', token.substring(0, 50));
+      
+      return token;
+    } catch (error) {
+      console.error('❌ Failed to get access token:', error);
+      return null;
     }
-    const session = await fetchAuthSession();
-    return session.tokens?.accessToken?.toString() || null;
   };
 
   const testEndpoint = async (name: string, url: string, method = 'GET') => {
@@ -25,9 +77,12 @@ export default function ApiTestPage() {
     setResults(prev => ({ ...prev, [name]: null }));
 
     try {
+      console.log(`\n🧪 Testing ${name} endpoint: ${method} ${url}`);
+      
       const token = await getAccessToken();
       
       if (!token) {
+        console.error('❌ No token available - cannot proceed');
         setResults(prev => ({ 
           ...prev, 
           [name]: { error: 'No access token found. Please log in.' } 
@@ -35,8 +90,8 @@ export default function ApiTestPage() {
         return;
       }
 
-      console.log(`Testing ${name}...`);
-      console.log('Token (first 50 chars):', token.substring(0, 50));
+      console.log('✅ Token obtained, making request...');
+      console.log('Authorization header:', `Bearer ${token.substring(0, 30)}...`);
 
       const response = await fetch(url, {
         method,
@@ -46,7 +101,10 @@ export default function ApiTestPage() {
         },
       });
 
+      console.log('📥 Response status:', response.status);
+      
       const data = await response.json();
+      console.log('📥 Response data:', data);
       
       setResults(prev => ({ 
         ...prev, 
@@ -58,6 +116,7 @@ export default function ApiTestPage() {
       }));
 
     } catch (error: any) {
+      console.error('❌ Request failed:', error);
       setResults(prev => ({ 
         ...prev, 
         [name]: { 
@@ -70,9 +129,21 @@ export default function ApiTestPage() {
     }
   };
 
+  // Show loading while Amplify is being configured
+  if (!amplifyConfigured) {
+    return (
+      <div className="container mx-auto max-w-4xl py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="text-muted-foreground">Initializing...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto max-w-4xl py-8">
-      <div className="space-y-6">
+    <div className="container mx-auto max-w-4xl py-8">     <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">API Testing</h1>
           <p className="mt-2 text-muted-foreground">

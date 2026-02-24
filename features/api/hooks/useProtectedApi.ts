@@ -8,6 +8,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { getStoredTokens, isAuth0Authenticated } from '@/lib/auth/auth0';
+import { configureAmplify } from '@/lib/auth/amplify-config';
+import { configureAmplifyOAuth } from '@/lib/auth/amplify-config-oauth';
+import { config } from '@/lib/config/env';
+
+// Configure Amplify on module load
+if (typeof window !== 'undefined') {
+  const oauthClientId = config.cognito.oauthClientId;
+  const hasOAuthCookie = document.cookie.includes(oauthClientId);
+  
+  if (hasOAuthCookie) {
+    console.log('🔵 useProtectedApi - Detected Cognito OAuth session');
+    configureAmplifyOAuth();
+  } else {
+    console.log('🟢 useProtectedApi - Detected Cognito SRP session');
+    configureAmplify();
+  }
+}
 
 /**
  * Get current access token (Cognito or Auth0)
@@ -17,15 +34,19 @@ async function getAccessToken(): Promise<string | null> {
     // Check Auth0 first
     if (isAuth0Authenticated()) {
       const tokens = getStoredTokens();
+      console.log('🔵 getAccessToken - Using Auth0 token');
       return tokens?.accessToken || null;
     }
     
     // Cognito (Amplify)
+    console.log('🟢 getAccessToken - Fetching Cognito session');
     const session = await fetchAuthSession();
-    return session.tokens?.accessToken?.toString() || null;
+    const token = session.tokens?.accessToken?.toString() || null;
+    console.log('🟢 getAccessToken - Token retrieved:', token ? `${token.substring(0, 30)}...` : 'NONE');
+    return token;
     
   } catch (error) {
-    console.error('Failed to get access token:', error);
+    console.error('❌ Failed to get access token:', error);
     return null;
   }
 }

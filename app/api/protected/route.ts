@@ -8,10 +8,15 @@
 import { validateRequest } from '@/lib/auth/api-validator';
 
 export async function GET(request: Request) {
+  // Debug: Log incoming headers
+  const authHeader = request.headers.get('Authorization');
+  console.log('🔍 API /protected - Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING');
+  
   // Validate authentication
   const validation = await validateRequest(request);
   
   if (!validation.isValid) {
+    console.error('❌ Validation failed:', validation.error);
     return new Response(
       JSON.stringify({ error: validation.error }),
       { 

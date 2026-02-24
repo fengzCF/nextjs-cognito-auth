@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Spinner } from '@/components/ui/Spinner';
 import { configureAmplify } from '@/lib/auth/amplify-config';
 import { configureAmplifyOAuth } from '@/lib/auth/amplify-config-oauth';
+import { config } from '@/lib/config/env';
 
 // Configure Amplify BEFORE component renders
 if (typeof window !== 'undefined') {
-  const hasOAuthCookie = document.cookie.includes('ojkkctuvfmhpv4d16gvsjt6co');
+  const oauthClientId = config.cognito.oauthClientId;
+  const hasOAuthCookie = document.cookie.includes(oauthClientId);
   
   if (hasOAuthCookie) {
     console.log('🔵 Detected Cognito OAuth session - configuring OAuth client');

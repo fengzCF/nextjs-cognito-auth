@@ -113,8 +113,12 @@ function validateJWT(token: string): { valid: boolean; decoded?: DecodedToken; e
 async function extractToken(request: Request): Promise<string | null> {
   // 1. Try Authorization header (Bearer token)
   const authHeader = request.headers.get('Authorization');
+  console.log('🔍 extractToken - Authorization header:', authHeader ? `${authHeader.substring(0, 30)}...` : 'MISSING');
+  
   if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.substring(7);
+    const token = authHeader.substring(7);
+    console.log('✅ Token extracted from Authorization header, length:', token.length);
+    return token;
   }
   
   // 2. Try cookies (Cognito or Auth0)
@@ -123,18 +127,23 @@ async function extractToken(request: Request): Promise<string | null> {
   // Check Auth0 cookie
   const auth0Token = cookieStore.get('auth0_access_token')?.value;
   if (auth0Token) {
+    console.log('✅ Token extracted from Auth0 cookie');
     return auth0Token;
   }
   
   // Check Cognito cookie (Amplify stores tokens with pattern)
   const allCookies = cookieStore.getAll();
+  console.log('🔍 Total cookies found:', allCookies.length);
+  
   for (const cookie of allCookies) {
     if (cookie.name.includes('CognitoIdentityServiceProvider') && 
         cookie.name.includes('accessToken')) {
+      console.log('✅ Token extracted from Cognito cookie:', cookie.name);
       return cookie.value;
     }
   }
   
+  console.log('❌ No token found in headers or cookies');
   return null;
 }
 
@@ -164,19 +173,25 @@ function detectProvider(decoded: DecodedToken): 'cognito' | 'auth0' {
  */
 export async function validateRequest(request: Request): Promise<ValidationResult> {
   try {
+    console.log('🔍 validateRequest - Starting validation');
+    
     // 1. Extract token
     const token = await extractToken(request);
     if (!token) {
+      console.error('❌ No token extracted');
       return {
         isValid: false,
-        error: 'No access token found',
+        error: 'No access token found. Please log in.',
         status: 401,
       };
     }
     
+    console.log('✅ Token extracted, length:', token.length);
+    
     // 2. Validate JWT structure and expiration
     const validation = validateJWT(token);
     if (!validation.valid || !validation.decoded) {
+      console.error('❌ JWT validation failed:', validation.error);
       return {
         isValid: false,
         error: validation.error || 'Invalid token',
@@ -184,9 +199,13 @@ export async function validateRequest(request: Request): Promise<ValidationResul
       };
     }
     
+    console.log('✅ JWT validated successfully');
+    
     // 3. Extract user information
     const decoded = validation.decoded;
     const provider = detectProvider(decoded);
+    
+    console.log('✅ User authenticated:', { id: decoded.sub, provider });
     
     return {
       isValid: true,
@@ -199,7 +218,7 @@ export async function validateRequest(request: Request): Promise<ValidationResul
     };
     
   } catch (error) {
-    console.error('Token validation error:', error);
+    console.error('❌ Token validation error:', error);
     return {
       isValid: false,
       error: 'Internal validation error',
